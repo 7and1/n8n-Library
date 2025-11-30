@@ -19,6 +19,18 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Check if pre-built data exists (skip ETL on CI when data is already committed)
+const prebuiltIndex = path.resolve(__dirname, '../public/data/index.json');
+const prebuiltWorkflows = path.resolve(__dirname, '../public/data/workflows/');
+if (fs.existsSync(prebuiltIndex) && fs.existsSync(prebuiltWorkflows)) {
+  const files = fs.readdirSync(prebuiltWorkflows);
+  if (files.length > 0) {
+    console.log('✅ Pre-built data found, skipping ETL pipeline');
+    console.log(`   Found ${files.length} workflow files in public/data/workflows/`);
+    process.exit(0);
+  }
+}
+
 // Import helper modules
 const {
   CATEGORIES,
