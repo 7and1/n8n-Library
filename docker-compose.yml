@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  n8n-library:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: n8n-library
+    restart: unless-stopped
+    ports:
+      - "3010:80"
+    volumes:
+      - ./logs:/var/log/nginx
+    environment:
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

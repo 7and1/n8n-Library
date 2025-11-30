@@ -1,0 +1,11 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+
+# Host
+Host: https://n8n-library.com
+
+# Sitemaps
+Sitemap: https://n8n-library.com/sitemap.xml
