@@ -7,7 +7,6 @@ import {
   Box,
   GitFork,
   Calendar,
-  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,6 +16,9 @@ import { CategoryBadge } from '@/components/workflow/CategoryBadge';
 import { TriggerBadge } from '@/components/workflow/TriggerBadge';
 import { IntegrationIcon } from '@/components/workflow/IntegrationIcon';
 import { WorkflowGrid } from '@/components/workflow/WorkflowGrid';
+import { WorkflowCanvas } from '@/components/workflow/WorkflowCanvas';
+import { PrerequisitesSection } from '@/components/workflow/PrerequisitesSection';
+import { UseCasesSection } from '@/components/workflow/UseCasesSection';
 import {
   getAllWorkflowSlugs,
   getWorkflowBySlug,
@@ -28,7 +30,7 @@ import {
   generateBreadcrumbJsonLd,
 } from '@/lib/seo';
 import { formatDate } from '@/lib/utils';
-import { CopyButton, DownloadButton, JsonCodePreview, WorkflowVisualization } from './client-components';
+import { ImportActions, JsonCodePreview } from './client-components';
 
 interface WorkflowPageProps {
   params: {
@@ -132,19 +134,12 @@ export default async function WorkflowPage({ params }: WorkflowPageProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap items-center gap-3 mb-8">
-                <DownloadButton workflow={workflow.workflow} name={workflow.slug} />
-                <CopyButton workflow={workflow.workflow} />
-                <a
-                  href={workflow.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" className="gap-2">
-                    <ExternalLink className="w-4 h-4" />
-                    View on GitHub
-                  </Button>
-                </a>
+              <div className="mb-8">
+                <ImportActions
+                  workflow={workflow.workflow}
+                  workflowSlug={workflow.slug}
+                  sourceUrl={workflow.sourceUrl}
+                />
               </div>
 
               {/* Integrations */}
@@ -174,70 +169,25 @@ export default async function WorkflowPage({ params }: WorkflowPageProps) {
 
               {/* Workflow Visualization */}
               <div className="mb-6">
-                <WorkflowVisualization workflow={workflow.workflow} />
+                <WorkflowCanvas workflow={workflow.workflow} />
               </div>
+
+              {/* Prerequisites */}
+              <PrerequisitesSection workflow={workflow.workflow} className="mb-6" />
+
+              {/* Use Cases */}
+              <UseCasesSection
+                workflow={workflow.workflow}
+                workflowName={workflow.name}
+                category={workflow.category}
+                integrations={workflow.integrations.map(i => i.name)}
+                className="mb-6"
+              />
 
               {/* JSON Code Preview */}
               <div className="mb-6">
                 <JsonCodePreview workflow={workflow.workflow} />
               </div>
-
-              {/* How to use */}
-              <Card className="p-6 mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  How to Use This Workflow
-                </h2>
-                <ol className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-medium">
-                      1
-                    </span>
-                    <div>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <strong>Download</strong> the JSON file using the button above
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-medium">
-                      2
-                    </span>
-                    <div>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <strong>Import</strong> in n8n: Workflows → Import from File
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-medium">
-                      3
-                    </span>
-                    <div>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <strong>Configure</strong> your credentials for each integration
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-medium">
-                      4
-                    </span>
-                    <div>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <strong>Customize</strong> the workflow to fit your needs
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="flex-shrink-0 w-6 h-6 text-green-500" />
-                    <div>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <strong>Activate</strong> and you&apos;re ready to go!
-                      </p>
-                    </div>
-                  </li>
-                </ol>
-              </Card>
 
               {/* Tags */}
               {workflow.tags.length > 0 && (

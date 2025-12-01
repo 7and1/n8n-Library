@@ -1,11 +1,16 @@
+'use client';
+
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { GitFork, Box } from 'lucide-react';
+import { GitFork, Box, Eye } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { QualityStars } from './QualityStars';
 import { CategoryBadge } from './CategoryBadge';
 import { TriggerBadge } from './TriggerBadge';
 import { IntegrationIcons } from './IntegrationIcon';
+import { useWorkflowPreview } from '@/contexts/WorkflowPreviewContext';
 import { cn, truncate } from '@/lib/utils';
 import type { WorkflowMeta, Integration } from '@/types';
 
@@ -14,6 +19,7 @@ interface WorkflowCardProps {
   integrationDetails?: Integration[];
   variant?: 'default' | 'compact' | 'featured';
   className?: string;
+  showPreviewButton?: boolean;
 }
 
 export function WorkflowCard({
@@ -21,9 +27,12 @@ export function WorkflowCard({
   integrationDetails,
   variant = 'default',
   className,
+  showPreviewButton = true,
 }: WorkflowCardProps) {
   const isCompact = variant === 'compact';
   const isFeatured = variant === 'featured';
+  const [isHovered, setIsHovered] = useState(false);
+  const { openPreview } = useWorkflowPreview();
 
   // Prepare integration data for icons
   const integrations = integrationDetails ||
@@ -33,8 +42,22 @@ export function WorkflowCard({
       icon: slug,
     }));
 
+  const handlePreviewClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openPreview(workflow);
+    },
+    [openPreview, workflow]
+  );
+
   return (
-    <Link href={`/workflow/${workflow.slug}/`} className="block no-underline group">
+    <Link
+      href={`/workflow/${workflow.slug}/`}
+      className="block no-underline group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <Card
         className={cn(
           'relative overflow-hidden transition-all duration-200',
@@ -116,6 +139,21 @@ export function WorkflowCard({
 
         {/* Hover effect overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-brand-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+        {/* Preview button - shows on hover */}
+        {showPreviewButton && !isCompact && isHovered && (
+          <div className="absolute top-2 right-2 z-10">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handlePreviewClick}
+              className="gap-1.5 h-8 px-2.5 shadow-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="text-xs">Preview</span>
+            </Button>
+          </div>
+        )}
       </Card>
     </Link>
   );

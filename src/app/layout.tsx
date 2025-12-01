@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { WorkflowPreviewProvider } from '@/contexts/WorkflowPreviewContext';
+import { WorkflowPreviewModal } from '@/components/workflow/WorkflowPreviewModal';
 import { defaultMetadata, generateWebsiteJsonLd } from '@/lib/seo';
 import './globals.css';
 
@@ -35,11 +37,14 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased">
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
+        <WorkflowPreviewProvider>
+          <div className="flex flex-col min-h-screen">
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+          <WorkflowPreviewModal />
+        </WorkflowPreviewProvider>
       </body>
     </html>
   );
