@@ -1,18 +1,14 @@
 'use client';
 
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Workflow, AlertCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { N8nWorkflow } from '@/types';
-import type { CanvasNode, CanvasConnection, NodeCategory } from '@/types/workflow-visualization';
+import type { CanvasNode, NodeCategory } from '@/types/workflow-visualization';
 import {
   parseWorkflow,
-  NODE_COLORS,
-  generateConnectionPath,
   sortNodesForLinearDisplay,
-  hasValidConnections,
-  DEFAULT_CANVAS_CONFIG,
 } from '@/lib/workflow-visualization';
 
 interface WorkflowCanvasProps {
@@ -21,99 +17,19 @@ interface WorkflowCanvasProps {
   compact?: boolean;
 }
 
-// Node component
-function CanvasNodeComponent({
-  node,
-  scale,
-}: {
-  node: CanvasNode;
-  scale: number;
-}) {
-  const colors = NODE_COLORS[node.category];
-  const fontSize = Math.max(10, 12 * scale);
+// Tailwind color classes for HTML legend
+const NODE_COLORS: Record<NodeCategory, { bg: string; border: string; text: string }> = {
+  trigger: { bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-400 dark:border-green-600', text: 'text-green-700 dark:text-green-300' },
+  http: { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-400 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-300' },
+  code: { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-400 dark:border-purple-600', text: 'text-purple-700 dark:text-purple-300' },
+  logic: { bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-400 dark:border-orange-600', text: 'text-orange-700 dark:text-orange-300' },
+  transform: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-400 dark:border-yellow-600', text: 'text-yellow-700 dark:text-yellow-300' },
+  action: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-400 dark:border-indigo-600', text: 'text-indigo-700 dark:text-indigo-300' },
+  note: { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-300 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-300' },
+  default: { bg: 'bg-gray-100 dark:bg-gray-800', border: 'border-gray-400 dark:border-gray-600', text: 'text-gray-700 dark:text-gray-300' },
+};
 
-  return (
-    <g transform={`translate(${node.x}, ${node.y})`}>
-      {/* Node background */}
-      <rect
-        width={node.width}
-        height={node.height}
-        rx={8}
-        className={`${colors.bg} ${colors.darkBg} stroke-2 ${colors.border} ${colors.darkBorder}`}
-        style={{ fill: 'currentColor' }}
-      />
-      {/* Credential indicator */}
-      {node.hasCredentials && (
-        <circle
-          cx={node.width - 8}
-          cy={8}
-          r={5}
-          className="fill-amber-500 dark:fill-amber-400"
-        />
-      )}
-      {/* Node type label */}
-      <text
-        x={node.width / 2}
-        y={18}
-        textAnchor="middle"
-        className={`${colors.text} ${colors.darkText} font-medium`}
-        style={{ fontSize: fontSize - 2 }}
-      >
-        {node.shortType.length > 16
-          ? node.shortType.substring(0, 14) + '...'
-          : node.shortType}
-      </text>
-      {/* Node name */}
-      <text
-        x={node.width / 2}
-        y={38}
-        textAnchor="middle"
-        className="fill-gray-900 dark:fill-white font-semibold"
-        style={{ fontSize }}
-      >
-        {node.name.length > 14 ? node.name.substring(0, 12) + '...' : node.name}
-      </text>
-    </g>
-  );
-}
-
-// Connection path component
-function ConnectionPathComponent({
-  connection,
-  nodes,
-  config,
-}: {
-  connection: CanvasConnection;
-  nodes: Map<string, CanvasNode>;
-  config: typeof DEFAULT_CANVAS_CONFIG;
-}) {
-  const sourceNode = nodes.get(connection.sourceId);
-  const targetNode = nodes.get(connection.targetId);
-
-  if (!sourceNode || !targetNode) return null;
-
-  const path = generateConnectionPath(
-    sourceNode.x,
-    sourceNode.y,
-    targetNode.x,
-    targetNode.y,
-    config.nodeWidth,
-    config.nodeHeight
-  );
-
-  return (
-    <path
-      d={path}
-      fill="none"
-      className="stroke-gray-400 dark:stroke-gray-500"
-      strokeWidth={2}
-      strokeLinecap="round"
-      markerEnd="url(#arrowhead)"
-    />
-  );
-}
-
-// Linear fallback visualization
+// Linear visualization (using HTML/Tailwind for proper styling)
 function LinearVisualization({
   nodes,
   compact,
@@ -124,23 +40,23 @@ function LinearVisualization({
   const sortedNodes = sortNodesForLinearDisplay(nodes);
 
   return (
-    <div className={`flex flex-wrap gap-2 items-center ${compact ? 'p-2' : 'p-4'}`}>
+    <div className={`flex flex-wrap gap-3 items-center justify-start ${compact ? 'p-3' : 'p-6'}`}>
       {sortedNodes.map((node, index) => {
         const colors = NODE_COLORS[node.category];
         return (
-          <div key={node.id} className="flex items-center gap-2">
+          <div key={node.id} className="flex items-center gap-3">
             <div
               className={`
-                ${compact ? 'px-2 py-1.5 min-w-[80px] max-w-[120px]' : 'px-3 py-2 min-w-[100px] max-w-[160px]'}
-                rounded-lg border-2 ${colors.bg} ${colors.darkBg} ${colors.border} ${colors.darkBorder}
-                relative
+                ${compact ? 'px-3 py-2 min-w-[100px] max-w-[140px]' : 'px-4 py-3 min-w-[120px] max-w-[180px]'}
+                rounded-lg border-2 shadow-sm ${colors.bg} ${colors.border}
+                relative transition-all hover:shadow-md
               `}
             >
               {node.hasCredentials && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white dark:border-gray-900" />
               )}
               <div
-                className={`text-[10px] font-medium ${colors.text} ${colors.darkText} truncate`}
+                className={`text-[10px] font-medium ${colors.text} truncate mb-0.5`}
               >
                 {node.shortType}
               </div>
@@ -152,9 +68,16 @@ function LinearVisualization({
               </div>
             </div>
             {index < sortedNodes.length - 1 && (
-              <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">
-                →
-              </span>
+              <svg width="24" height="24" viewBox="0 0 24 24" className="text-gray-400 dark:text-gray-500 flex-shrink-0">
+                <path
+                  d="M5 12h14m-4-4l4 4-4 4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             )}
           </div>
         );
@@ -166,8 +89,8 @@ function LinearVisualization({
 // Legend component
 function CanvasLegend({ categories }: { categories: Set<NodeCategory> }) {
   return (
-    <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-      <span className="text-xs text-gray-500 dark:text-gray-400">
+    <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
         Node Types:
       </span>
       {Array.from(categories).map((category) => {
@@ -175,7 +98,7 @@ function CanvasLegend({ categories }: { categories: Set<NodeCategory> }) {
         return (
           <div key={category} className="flex items-center gap-1.5">
             <div
-              className={`w-3 h-3 rounded ${colors.bg} ${colors.darkBg} border ${colors.border} ${colors.darkBorder}`}
+              className={`w-3 h-3 rounded ${colors.bg} border ${colors.border}`}
             />
             <span className="text-xs text-gray-600 dark:text-gray-400 capitalize">
               {category}
@@ -183,8 +106,8 @@ function CanvasLegend({ categories }: { categories: Set<NodeCategory> }) {
           </div>
         );
       })}
-      <div className="flex items-center gap-1.5 ml-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+      <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300 dark:border-gray-600">
+        <span className="w-3 h-3 rounded-full bg-amber-500" />
         <span className="text-xs text-gray-600 dark:text-gray-400">
           Requires credentials
         </span>
@@ -199,66 +122,25 @@ export function WorkflowCanvas({
   compact = false,
 }: WorkflowCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
 
   // Parse workflow data
   const parsed = useMemo(() => {
-    return parseWorkflow(
-      workflow,
-      dimensions.width,
-      compact ? 250 : dimensions.height
-    );
-  }, [workflow, dimensions, compact]);
-
-  // Check if we have valid connections
-  const useGraphView = useMemo(
-    () => hasValidConnections(workflow) && parsed.connections.length > 0,
-    [workflow, parsed]
-  );
+    return parseWorkflow(workflow, 800, compact ? 200 : 300);
+  }, [workflow, compact]);
 
   // Get unique categories for legend
   const categories = useMemo(() => {
     const cats = new Set<NodeCategory>();
     parsed.nodes.forEach((node) => cats.add(node.category));
-    cats.delete('note'); // Don't show sticky notes in legend
+    cats.delete('note');
     return cats;
   }, [parsed.nodes]);
-
-  // Create node lookup map
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, CanvasNode>();
-    parsed.nodes.forEach((node) => map.set(node.id, node));
-    return map;
-  }, [parsed.nodes]);
-
-  // Handle resize
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        setDimensions({
-          width: entry.contentRect.width,
-          height: compact ? 250 : Math.max(300, entry.contentRect.height),
-        });
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [compact]);
 
   // Zoom controls
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.2, 2));
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.2, 0.5));
-  const handleReset = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  const handleReset = () => setZoom(1);
 
   // Empty state
   if (parsed.nodes.length === 0) {
@@ -282,7 +164,7 @@ export function WorkflowCanvas({
             Workflow Structure ({parsed.nodes.length} nodes)
           </span>
         </div>
-        {useGraphView && !compact && (
+        {!compact && (
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -293,7 +175,7 @@ export function WorkflowCanvas({
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
-            <span className="text-xs text-gray-500 w-10 text-center">
+            <span className="text-xs text-gray-500 w-12 text-center">
               {Math.round(zoom * 100)}%
             </span>
             <Button
@@ -318,61 +200,18 @@ export function WorkflowCanvas({
         )}
       </div>
 
-      {/* Canvas */}
+      {/* Canvas - Always use LinearVisualization for clearer display */}
       <div
         ref={containerRef}
-        className={`relative ${compact ? 'min-h-[200px]' : 'min-h-[300px]'} bg-white dark:bg-gray-900`}
+        className={`relative bg-white dark:bg-gray-900 overflow-auto`}
+        style={{
+          minHeight: compact ? 150 : 180,
+          maxHeight: compact ? 250 : 400,
+          transform: `scale(${zoom})`,
+          transformOrigin: 'top left',
+        }}
       >
-        {useGraphView ? (
-          <svg
-            width="100%"
-            height={compact ? 250 : 400}
-            viewBox={`0 0 ${dimensions.width} ${compact ? 250 : dimensions.height}`}
-            className="overflow-visible"
-            style={{
-              transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-              transformOrigin: 'center center',
-            }}
-          >
-            {/* Defs for arrow marker */}
-            <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
-                orient="auto"
-              >
-                <polygon
-                  points="0 0, 10 3.5, 0 7"
-                  className="fill-gray-400 dark:fill-gray-500"
-                />
-              </marker>
-            </defs>
-
-            {/* Connections */}
-            <g className="connections">
-              {parsed.connections.map((conn) => (
-                <ConnectionPathComponent
-                  key={conn.id}
-                  connection={conn}
-                  nodes={nodeMap}
-                  config={DEFAULT_CANVAS_CONFIG}
-                />
-              ))}
-            </g>
-
-            {/* Nodes */}
-            <g className="nodes">
-              {parsed.nodes.map((node) => (
-                <CanvasNodeComponent key={node.id} node={node} scale={zoom} />
-              ))}
-            </g>
-          </svg>
-        ) : (
-          <LinearVisualization nodes={parsed.nodes} compact={compact} />
-        )}
+        <LinearVisualization nodes={parsed.nodes} compact={compact} />
       </div>
 
       {/* Legend */}
