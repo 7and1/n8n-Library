@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Github, Twitter, Heart, ExternalLink, Mail } from 'lucide-react';
+import { Github, Heart, ExternalLink, Mail } from 'lucide-react';
 
 const footerLinks = {
   browse: [
@@ -43,22 +43,13 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="https://github.com/enescingoz/awesome-n8n-templates"
+                href="https://github.com/7and1/n8n-library"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <Github className="w-5 h-5" />
                 <span className="sr-only">GitHub</span>
-              </a>
-              <a
-                href="https://twitter.com/n8n_io"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                <Twitter className="w-5 h-5" />
-                <span className="sr-only">Twitter</span>
               </a>
               <a
                 href="mailto:auto@n8n-library.com"
