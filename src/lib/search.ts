@@ -1,51 +1,4 @@
-'use client';
-
-import Fuse, { IFuseOptions } from 'fuse.js';
-import type { WorkflowMeta, FilterState, SortOption } from '@/types';
-
-// Fuse.js options for fuzzy search
-const fuseOptions: IFuseOptions<WorkflowMeta> = {
-  keys: [
-    { name: 'name', weight: 0.4 },
-    { name: 'description', weight: 0.3 },
-    { name: 'integrations', weight: 0.2 },
-    { name: 'categoryName', weight: 0.1 },
-  ],
-  threshold: 0.4,
-  ignoreLocation: true,
-  includeScore: true,
-  minMatchCharLength: 2,
-};
-
-let fuseInstance: Fuse<WorkflowMeta> | null = null;
-let cachedWorkflows: WorkflowMeta[] | null = null;
-
-/**
- * Initialize or get Fuse instance
- */
-export function initSearch(workflows: WorkflowMeta[]): Fuse<WorkflowMeta> {
-  if (!fuseInstance || cachedWorkflows !== workflows) {
-    fuseInstance = new Fuse(workflows, fuseOptions);
-    cachedWorkflows = workflows;
-  }
-  return fuseInstance;
-}
-
-/**
- * Search workflows with Fuse.js
- */
-export function searchWorkflows(
-  workflows: WorkflowMeta[],
-  query: string
-): WorkflowMeta[] {
-  if (!query.trim()) {
-    return workflows;
-  }
-
-  const fuse = initSearch(workflows);
-  const results = fuse.search(query);
-  return results.map((r) => r.item);
-}
+import type { FilterState, SortOption, WorkflowMeta } from '@/types';
 
 /**
  * Apply filters to workflows
@@ -121,29 +74,6 @@ export function sortWorkflows(
 }
 
 /**
- * Combined search, filter, and sort
- */
-export function processWorkflows(
-  workflows: WorkflowMeta[],
-  filters: FilterState
-): WorkflowMeta[] {
-  // First search if there's a query
-  let processed = filters.query
-    ? searchWorkflows(workflows, filters.query)
-    : workflows;
-
-  // Apply filters
-  processed = filterWorkflows(processed, filters);
-
-  // Sort (skip if searching - already sorted by relevance)
-  if (!filters.query || filters.sortBy !== 'relevance') {
-    processed = sortWorkflows(processed, filters.sortBy);
-  }
-
-  return processed;
-}
-
-/**
  * Get default filter state
  */
 export function getDefaultFilterState(): FilterState {
@@ -158,43 +88,58 @@ export function getDefaultFilterState(): FilterState {
   };
 }
 
-/**
- * Parse filters from URL search params
- */
-export function parseFiltersFromURL(searchParams: URLSearchParams): Partial<FilterState> {
+export function withDefaultFilters(partial: Partial<FilterState>): FilterState {
+  return { ...getDefaultFilterState(), ...partial };
+}
+
+function mapFiltersFromRecord(getValue: (key: string) => string | null): Partial<FilterState> {
   const filters: Partial<FilterState> = {};
 
-  const q = searchParams.get('q');
+  const q = getValue('q');
   if (q) filters.query = q;
 
-  const category = searchParams.get('category');
+  const category = getValue('category');
   if (category) filters.category = category;
 
-  const integration = searchParams.get('integration');
+  const integration = getValue('integration');
   if (integration) filters.integration = integration;
 
-  const source = searchParams.get('source') as FilterState['source'];
+  const source = getValue('source') as FilterState['source'];
   if (source && ['all', 'awesome', 'community'].includes(source)) {
     filters.source = source;
   }
 
-  const quality = searchParams.get('quality');
+  const quality = getValue('quality');
   if (quality) {
     const qualityNum = parseInt(quality, 10);
     if (qualityNum >= 1 && qualityNum <= 5) filters.quality = qualityNum;
   }
 
-  const trigger = searchParams.get('trigger') as FilterState['triggerType'];
+  const trigger = getValue('trigger') as FilterState['triggerType'];
   if (trigger && ['webhook', 'schedule', 'event', 'manual'].includes(trigger)) {
     filters.triggerType = trigger;
   }
 
-  const sort = searchParams.get('sort') as SortOption;
+  const sort = getValue('sort') as SortOption;
   if (sort && ['relevance', 'quality', 'nodes', 'newest', 'name'].includes(sort)) {
     filters.sortBy = sort;
   }
 
   return filters;
+}
+
+export function parseFiltersFromURL(searchParams: URLSearchParams): Partial<FilterState> {
+  return mapFiltersFromRecord((key) => searchParams.get(key));
+}
+
+export function parseFiltersFromObject(
+  params: Record<string, string | string[] | undefined>
+): Partial<FilterState> {
+  return mapFiltersFromRecord((key) => {
+    const value = params[key];
+    if (Array.isArray(value)) return value[0] ?? null;
+    return value ?? null;
+  });
 }
 
 /**
@@ -213,4 +158,14 @@ export function buildURLFromFilters(filters: FilterState, basePath: string = '/s
 
   const queryString = params.toString();
   return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
+export function clampPage(page?: number | null): number {
+  if (!page || Number.isNaN(page) || page < 1) return 1;
+  return page;
+}
+
+export function clampPageSize(size?: number | null, max: number = 48): number {
+  if (!size || Number.isNaN(size) || size < 1) return 24;
+  return Math.min(size, max);
 }

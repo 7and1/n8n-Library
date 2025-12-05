@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, CheckCircle2, Zap, Clock, Download } from 'lucide-react';
+import { ArrowLeft, ChevronRight, CheckCircle2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { WorkflowGrid } from '@/components/workflow/WorkflowGrid';

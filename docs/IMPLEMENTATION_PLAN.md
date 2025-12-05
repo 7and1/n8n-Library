@@ -848,11 +848,11 @@ grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
 
 | 页面 | Title | Description |
 |------|-------|-------------|
-| 首页 | `2,300+ Free n8n Workflow Templates - n8n Library` | `Discover 2,300+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds.` |
+| 首页 | `2,348+ Free n8n Workflow Templates - n8n Library` | `Discover 2,348+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds.` |
 | 分类 | `{Category} n8n Templates & Workflows - n8n Library` | `Browse {count} free n8n {category} templates. Ready-to-use workflows. One-click import.` |
 | 集成 | `n8n {Integration} Workflow Templates - n8n Library` | `{count} n8n workflow templates using {Integration}. Ready-made automations.` |
 | 详情 | `{Name} - Free n8n Template` | `{description} Free n8n template with {nodeCount} nodes. Uses {integrations}.` |
-| 搜索 | `Search n8n Templates - n8n Library` | `Search 2,300+ free n8n workflow templates. Find automation workflows for any use case.` |
+| 搜索 | `Search n8n Templates - n8n Library` | `Search 2,348+ free n8n workflow templates. Find automation workflows for any use case.` |
 
 ### 9.2 Schema.org 结构化数据
 
@@ -1203,14 +1203,14 @@ jobs:
 2. GitHub Actions 缓存 node_modules
 3. 预期时间: 3-5 分钟
 
-### 12.4 客户端搜索内存
+### 12.4 搜索架构
 
-**问题**: Fuse.js 索引 2,300 条占用 ~10MB
+**现状**: Fuse.js 在 Node 端构建（`src/lib/search/engine.ts`），客户端只消费 `/api/workflows/search` JSON。
 
-**解决**:
-1. 现代浏览器可接受
-2. 使用 `ignoreFieldNorm: true` 优化
-3. 如需要可用 Web Worker
+**收益**:
+1. 不再向浏览器下发 2MB `index.json` + Fuse bundle，内存占用 <500KB。
+2. 通过 `datasetHash` + `meta.json` 热重载，确保 Fuse 在数据更新后自动重建。
+3. 客户端 VirtualizedGrid + skeleton 状态提升体验。
 
 ### 12.5 Slug 冲突
 

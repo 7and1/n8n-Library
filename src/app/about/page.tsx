@@ -8,7 +8,7 @@ import { getStats } from '@/lib/data';
 export const metadata: Metadata = {
   title: 'About n8n Library - Free Workflow Templates for Automation',
   description:
-    'n8n Library is the largest free collection of n8n workflow templates. 2,300+ automation examples, 150+ integrations. Learn about our mission and data sources.',
+    'n8n Library is the largest free collection of n8n workflow templates. 2,348+ automation examples, 360+ integrations. Learn about our mission and data sources.',
   keywords: [
     'n8n library',
     'workflow templates',
@@ -76,7 +76,7 @@ export default async function AboutPage() {
             not shipping features or growing your business.
           </p>
           <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed mb-4">
-            n8n Library exists to solve that problem. We&apos;ve collected over <strong>2,300 free
+            n8n Library exists to solve that problem. We&apos;ve collected over <strong>2,348 free
             n8n workflow templates</strong> from the community, organized them by category and
             integration, and made them available for anyone to download and use. No accounts,
             no subscriptions, no BS.

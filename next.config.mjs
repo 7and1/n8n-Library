@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Static export for VPS deployment
-  output: 'export',
-
   // Trailing slash for static hosting
   trailingSlash: true,
 

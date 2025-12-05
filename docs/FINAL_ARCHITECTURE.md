@@ -102,14 +102,14 @@
 |------|------|----------|
 | **框架** | Next.js 14 (App Router) | SSG 最佳支持，SEO 友好 |
 | **样式** | Tailwind CSS + shadcn/ui | 快速开发，组件丰富 |
-| **搜索** | Fuse.js (客户端) | 2,300条 <10ms，零服务器压力 |
+| **搜索** | Fuse.js (Node API) + VirtualizedGrid | 2,348条 <150ms，零服务器 bundle |
 | **数据** | 静态 JSON + Git Submodules | 无数据库，自动同步上游 |
 | **图标** | simple-icons + n8n CDN fallback | 覆盖率高，统一风格 |
 | **部署** | Cloudflare Pages (主) / VPS (备) | 全球 CDN，自动构建 |
 
 ### 2.3 为什么选静态方案？
 
-| 方案 | 2,300 模板 | 搜索延迟 | 月成本 | 维护 |
+| 方案 | 2,348 模板 | 搜索延迟 | 月成本 | 维护 |
 |------|-----------|----------|--------|------|
 | **静态 JSON + Fuse.js** | ✅ | <10ms | $0 | 零 |
 | PostgreSQL + API | ✅ | 50-200ms | $10+ | 中 |
@@ -202,7 +202,7 @@ n8n-library.com/
 │   └── 最新添加 (12个)
 │
 ├── /search                     # 搜索页 (CSR)
-│   ├── 即时搜索 (Fuse.js)
+│   ├── 即时搜索 (API + Fuse.js on Node)
 │   ├── 筛选: 分类 / 来源 / 节点数
 │   └── 虚拟滚动列表
 │
@@ -223,7 +223,7 @@ n8n-library.com/
 │   ├── /integration/slack
 │   └── ...
 │
-├── /workflow/[slug]            # 详情页 (SSG, ~2,300个)
+├── /workflow/[slug]            # 详情页 (SSG, ~2,348个)
 │   ├── 标题 + 描述
 │   ├── 节点流程可视化
 │   ├── 集成图标列表
@@ -243,10 +243,10 @@ n8n-library.com/
 | 搜索页 | CSR | - | 1 |
 | 分类页 | SSG | 8 个分类 slug | 8 |
 | 集成页 | SSG | Top 50 热门节点 | 50 |
-| 详情页 | SSG | 所有 workflow slug | ~2,300 |
+| 详情页 | SSG | 所有 workflow slug | ~2,348 |
 | 关于页 | SSG | - | 1 |
 
-**总计: ~2,360 个静态页面**
+**总计: ~2,380 个静态页面**
 
 ---
 
@@ -396,7 +396,7 @@ const N8N_ICON_CDN = 'https://n8n.io/integrations/';
 │  [Logo]  n8n Library    [Search...]           [GitHub] [About]  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│         2,300+ Free n8n Workflow Templates                      │
+│         2,348+ Free n8n Workflow Templates                      │
 │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                      │
 │         Unofficial community collection from GitHub             │
 │                                                                 │
@@ -525,7 +525,7 @@ const N8N_ICON_CDN = 'https://n8n.io/integrations/';
 
 | 页面 | Title 模板 |
 |------|-----------|
-| 首页 | `2,300+ Free n8n Workflow Templates - n8n Library` |
+| 首页 | `2,348+ Free n8n Workflow Templates - n8n Library` |
 | 分类页 | `{Category} n8n Templates & Workflows - n8n Library` |
 | 集成页 | `n8n {Integration} Workflow Templates - n8n Library` |
 | 详情页 | `{Workflow Name} - Free n8n Template` |
@@ -535,7 +535,7 @@ const N8N_ICON_CDN = 'https://n8n.io/integrations/';
 
 | 页面 | Description 模板 |
 |------|-----------------|
-| 首页 | `Discover 2,300+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds.` |
+| 首页 | `Discover 2,348+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds.` |
 | 分类页 | `Browse {count} free n8n {category} templates. Ready-to-use workflows for {use_cases}. One-click import.` |
 | 集成页 | `{count} n8n workflow templates using {Integration}. Automate {use_cases} with ready-made workflows.` |
 | 详情页 | `{description} Free n8n template with {nodeCount} nodes. Uses {integrations}. Copy JSON and import instantly.` |

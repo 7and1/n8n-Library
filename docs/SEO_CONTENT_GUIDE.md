@@ -36,7 +36,7 @@
         └──────────┬───────────┘
                    │
            ┌───────▼───────┐
-           │  详情页 x2,300 │
+           │  详情页 x2,348 │
            │  (长尾关键词)  │
            └───────────────┘
 ```
@@ -51,21 +51,21 @@
 
 **Title** (50-60 字符):
 ```
-2,300+ Free n8n Workflow Templates - n8n Library
+2,348+ Free n8n Workflow Templates - n8n Library
 ```
 
 **Meta Description** (150-160 字符):
 ```
-Discover 2,300+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds. Unofficial community collection.
+Discover 2,348+ free n8n workflow templates. Browse AI automation, email marketing, CRM integrations and more. Copy & import in seconds. Unofficial community collection.
 ```
 
 **H1**:
 ```
-2,300+ Free n8n Workflow Templates
+2,348+ Free n8n Workflow Templates
 ```
 
 **内容要点**:
-- 统计数字突出 (2,300+, 8 categories, 50+ integrations)
+- 统计数字突出 (2,348+, 8 categories, 360+ integrations)
 - Unofficial community 声明
 - 快速入口 (分类、热门集成)
 - 精选推荐 (Featured)
@@ -189,7 +189,7 @@ Search n8n Workflow Templates - n8n Library
 
 **Meta Description**:
 ```
-Search 2,300+ free n8n workflow templates. Filter by category, integration, or use case. Find the perfect automation for your needs.
+Search 2,348+ free n8n workflow templates. Filter by category, integration, or use case. Find the perfect automation for your needs.
 ```
 
 **注意**: 搜索页是 CSR，需要确保:
@@ -207,7 +207,7 @@ All n8n Workflow Templates A-Z - n8n Library
 
 **Meta Description**:
 ```
-Complete directory of 2,300+ n8n workflow templates. Browse alphabetically or by category. Find every automation template in one place.
+Complete directory of 2,348+ n8n workflow templates. Browse alphabetically or by category. Find every automation template in one place.
 ```
 
 ---
@@ -483,7 +483,7 @@ export const metadata = {
 ### 5.2 首页内容示例
 
 ```markdown
-# 2,300+ Free n8n Workflow Templates
+# 2,348+ Free n8n Workflow Templates
 
 Discover the largest unofficial collection of n8n automation templates.
 Browse, copy, and import ready-made workflows in seconds.

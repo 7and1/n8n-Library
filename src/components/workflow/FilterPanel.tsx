@@ -41,7 +41,7 @@ export function FilterPanel({
   filters,
   onFiltersChange,
   categories,
-  integrations: _integrations,
+  integrations,
   totalCount,
   filteredCount,
   className,
@@ -80,6 +80,11 @@ export function FilterPanel({
       triggerType: null,
     });
   };
+
+  const selectedIntegrationName = filters.integration
+    ? integrations.find((integration) => integration.slug === filters.integration)?.name ??
+      filters.integration
+    : null;
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -161,6 +166,27 @@ export function FilterPanel({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Integration filter */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              Integration
+            </label>
+            <select
+              value={filters.integration ?? ''}
+              onChange={(e) =>
+                updateFilter('integration', e.target.value ? e.target.value : null)
+              }
+              className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900"
+            >
+              <option value="">All integrations</option>
+              {integrations.map((integration) => (
+                <option key={integration.slug} value={integration.slug}>
+                  {integration.name} ({integration.count})
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Source filter */}
@@ -268,6 +294,16 @@ export function FilterPanel({
               onClick={() => updateFilter('category', null)}
             >
               {categories.find((c) => c.slug === filters.category)?.name}
+              <X className="w-3 h-3" />
+            </Badge>
+          )}
+          {filters.integration && (
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer hover:bg-gray-200"
+              onClick={() => updateFilter('integration', null)}
+            >
+              {selectedIntegrationName}
               <X className="w-3 h-3" />
             </Badge>
           )}

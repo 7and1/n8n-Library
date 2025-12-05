@@ -102,6 +102,15 @@ export interface SearchResult {
   }>;
 }
 
+export interface SearchResponse {
+  results: WorkflowMeta[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  tookMs: number;
+}
+
 // Filter state
 export interface FilterState {
   query: string;
@@ -129,6 +138,71 @@ export interface Stats {
   integrations: number;
   avgNodesPerWorkflow: string;
   generatedAt: string;
+}
+
+export interface RepoMetadata {
+  label: string;
+  path: string;
+  exists: boolean;
+  commit?: string;
+  shortCommit?: string;
+  lastCommitAt?: string;
+  remote?: string | null;
+  dirty?: boolean;
+  error?: string;
+}
+
+export interface CacheRevalidateInfo {
+  success: boolean;
+  status?: number;
+  timestamp: string;
+  url?: string;
+  body?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface DatasetMeta {
+  version: number;
+  datasetHash: string;
+  startedAt: string;
+  generatedAt: string;
+  durationMs: number;
+  cli: {
+    force: boolean;
+    since: string | null;
+    maxWorkers: number;
+    pretty: boolean;
+    source: string;
+  };
+  cache: {
+    manifestPath: string;
+    manifestEntries: number;
+    manifestUpdatedAt?: string | null;
+    hits: number;
+    misses: number;
+    skippedBySince: number;
+    usedSinceFilter: boolean;
+    revalidate: CacheRevalidateInfo | null;
+  };
+  counts: {
+    workflows: number;
+    workflowFiles: number;
+    categories: number;
+    integrations: number;
+    featuredIntegrations: number;
+  };
+  stats: Stats;
+  sources: {
+    awesome: RepoMetadata;
+    community: RepoMetadata;
+  };
+  files: {
+    index: string;
+    categories: string;
+    integrations: string;
+    integrationsTop: string;
+    workflowsDir: string;
+  };
 }
 
 // Page props for static generation

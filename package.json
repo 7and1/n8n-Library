@@ -1,7 +1,7 @@
 {
   "name": "n8n-library",
   "version": "1.0.0",
-  "description": "Unofficial n8n Workflow Template Library - Discover 2,300+ free automation templates",
+  "description": "Unofficial n8n Workflow Template Library - Discover 2,348+ free automation templates",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,6 +13,7 @@
     "export": "next build"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.10.8",
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

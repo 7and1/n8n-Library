@@ -24,7 +24,9 @@ data/raw/n8n-workflows/     ─┘
 输出:
   - public/data/index.json          (~2MB)
   - public/data/categories.json     (~2KB)
-  - public/data/integrations.json   (~10KB)
+  - public/data/integrations.json   (~30KB，364 个集成)
+  - public/data/integrations_top.json (Top150 集成，供首页/英雄区使用)
+  - public/data/meta.json           (数据集 hash、缓存命中、子模块 commit 信息)
   - public/data/workflows/[slug].json (每个 ~5-50KB)
 ```
 
@@ -41,7 +43,29 @@ node scripts/build-data.js --source=awesome
 
 # 只处理 community 库
 node scripts/build-data.js --source=community
+
+# 配合缓存 + webhook 刷新
+node scripts/build-data.js -- --since=2025-12-01 --revalidate-url=https://example.com/api/workflows/revalidate?secret=XYZ
 ```
+
+### 1.3 CLI 参数 & 缓存开关
+
+| 参数 / 环境变量 | 说明 |
+| --- | --- |
+| `--force` | 忽略 `.cache/workflow-manifest.json`，强制重建全部 2,348+ workflows |
+| `--since=2025-12-01` | 只处理指定时间后的文件；命中缓存的 workflow 直接复用 JSON 元数据 |
+| `--max-workers=6` | 手动设置并发度（默认 = CPU-1） |
+| `--source=awesome|community|all` | 限制数据源 |
+| `--pretty` | 以 `JSON.stringify(..., null, 2)` 输出，方便 diff/debug |
+| `--revalidate-url=<url>` | 构建完成后调用该 URL（通常是 `/api/workflows/revalidate`）刷新 Next.js `revalidateTag('workflows-data')` |
+| `WORKFLOW_REVALIDATE_TOKEN` | 若上面的 URL 需要 Bearer Token，可通过环境变量注入 |
+
+每次运行还会写入 `public/data/meta.json`，内容包括：
+
+- `datasetHash`：基于 `index.json` 生成的 MD5，可用于缓存 key
+- `sources`：awesome/n8n-workflows 子模块当前 commit（含 `dirty` 状态）
+- `cache.hits/misses/skippedBySince`：针对 manifest 缓存的命中统计
+- `counts`：Workflows / Categories / Integrations / Top Integrations 数量
 
 ---
 
@@ -961,7 +985,7 @@ main().catch(console.error);
 - [ ] `public/data/index.json` 存在且非空
 - [ ] `public/data/categories.json` 包含 8 个分类
 - [ ] `public/data/integrations.json` 包含 50+ 集成
-- [ ] `public/data/workflows/` 目录包含 ~2,300 个 JSON 文件
+- [ ] `public/data/workflows/` 目录包含 ~2,348 个 JSON 文件
 - [ ] 无重复 slug
 - [ ] 所有分类有对应 workflow
 - [ ] 无空描述

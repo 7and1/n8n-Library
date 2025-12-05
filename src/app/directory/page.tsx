@@ -1,32 +1,50 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { SearchClient } from '../search/client';
-import { getAllWorkflows, getCategories, getIntegrations } from '@/lib/data';
+import { getCategories, getIntegrations, getStats } from '@/lib/data';
 import { WorkflowGridSkeleton } from '@/components/workflow/WorkflowGrid';
+import { clampPage, clampPageSize, parseFiltersFromObject, withDefaultFilters } from '@/lib/search';
+import { executeWorkflowSearch } from '@/lib/search/engine';
 
 export const metadata: Metadata = {
   title: 'All Workflows Directory',
   description:
-    'Browse our complete directory of 2,300+ free n8n workflow templates. Filter by category, integration, quality, and more.',
+    'Browse our complete directory of 2,348+ free n8n workflow templates. Filter by category, integration, quality, and more.',
 };
+export const dynamic = 'force-dynamic';
 
-async function DirectoryContent() {
-  const [workflows, categories, integrations] = await Promise.all([
-    getAllWorkflows(),
+interface DirectoryPageProps {
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+async function DirectoryContent({ searchParams }: DirectoryPageProps) {
+  const partialFilters = parseFiltersFromObject(searchParams);
+  const filters = withDefaultFilters(partialFilters);
+  const pageParam = parseInt((searchParams.page as string) ?? '1', 10);
+  const pageSizeParam = parseInt((searchParams.pageSize as string) ?? '24', 10);
+  const page = clampPage(pageParam);
+  const pageSize = clampPageSize(pageSizeParam);
+
+  const [categories, integrations, stats, initialResponse] = await Promise.all([
     getCategories(),
     getIntegrations(),
+    getStats(),
+    executeWorkflowSearch(filters, page, pageSize),
   ]);
 
   return (
     <SearchClient
-      initialWorkflows={workflows}
       categories={categories}
       integrations={integrations}
+      initialFilters={filters}
+      initialResponse={initialResponse}
+      totalWorkflows={stats?.total ?? initialResponse.total}
+      basePath="/directory"
     />
   );
 }
 
-export default function DirectoryPage() {
+export default function DirectoryPage(props: DirectoryPageProps) {
   return (
     <div className="py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -49,7 +67,7 @@ export default function DirectoryPage() {
             </div>
           }
         >
-          <DirectoryContent />
+          <DirectoryContent {...props} />
         </Suspense>
       </div>
     </div>

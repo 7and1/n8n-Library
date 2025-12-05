@@ -1,27 +1,46 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { revalidateTag, unstable_cache } from 'next/cache';
 import type {
   WorkflowMeta,
   WorkflowDetail,
   Category,
   IntegrationSummary,
   Stats,
+  DatasetMeta,
 } from '@/types';
 
 const DATA_DIR = path.join(process.cwd(), 'public/data');
+export const WORKFLOW_DATA_TAG = 'workflows-data';
+
+const readJsonCached = unstable_cache(
+  async (relativePath: string) => {
+    const filePath = path.join(DATA_DIR, relativePath);
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  },
+  ['data-json-reader'],
+  { tags: [WORKFLOW_DATA_TAG] }
+);
+
+async function readJsonFile<T>(relativePath: string): Promise<T> {
+  try {
+    return (await readJsonCached(relativePath)) as T;
+  } catch (error) {
+    console.error(`Error loading data file ${relativePath}:`, error);
+    throw error;
+  }
+}
+
+export function invalidateWorkflowDataCache() {
+  revalidateTag(WORKFLOW_DATA_TAG);
+}
 
 /**
  * Get all workflows metadata (search index)
  */
 export async function getAllWorkflows(): Promise<WorkflowMeta[]> {
-  try {
-    const filePath = path.join(DATA_DIR, 'index.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as WorkflowMeta[];
-  } catch (error) {
-    console.error('Error loading workflows index:', error);
-    return [];
-  }
+  return readJsonFile<WorkflowMeta[]>('index.json');
 }
 
 /**
@@ -29,9 +48,7 @@ export async function getAllWorkflows(): Promise<WorkflowMeta[]> {
  */
 export async function getWorkflowBySlug(slug: string): Promise<WorkflowDetail | null> {
   try {
-    const filePath = path.join(DATA_DIR, 'workflows', `${slug}.json`);
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as WorkflowDetail;
+    return await readJsonFile<WorkflowDetail>(path.join('workflows', `${slug}.json`));
   } catch (error) {
     console.error(`Error loading workflow ${slug}:`, error);
     return null;
@@ -42,115 +59,82 @@ export async function getWorkflowBySlug(slug: string): Promise<WorkflowDetail | 
  * Get all workflow slugs for static generation
  */
 export async function getAllWorkflowSlugs(): Promise<string[]> {
-  try {
-    const workflows = await getAllWorkflows();
-    return workflows.map((w) => w.slug);
-  } catch (error) {
-    console.error('Error getting workflow slugs:', error);
-    return [];
-  }
+  const workflows = await getAllWorkflows();
+  return workflows.map((w) => w.slug);
 }
 
 /**
  * Get all categories
  */
 export async function getCategories(): Promise<Category[]> {
-  try {
-    const filePath = path.join(DATA_DIR, 'categories.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as Category[];
-  } catch (error) {
-    console.error('Error loading categories:', error);
-    return [];
-  }
+  return readJsonFile<Category[]>('categories.json');
 }
 
 /**
  * Get category by slug
  */
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  try {
-    const categories = await getCategories();
-    return categories.find((c) => c.slug === slug) || null;
-  } catch (error) {
-    console.error(`Error loading category ${slug}:`, error);
-    return null;
-  }
+  const categories = await getCategories();
+  return categories.find((c) => c.slug === slug) || null;
 }
 
 /**
  * Get all integrations
  */
 export async function getIntegrations(): Promise<IntegrationSummary[]> {
-  try {
-    const filePath = path.join(DATA_DIR, 'integrations.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as IntegrationSummary[];
-  } catch (error) {
-    console.error('Error loading integrations:', error);
-    return [];
+  return readJsonFile<IntegrationSummary[]>('integrations.json');
+}
+
+/**
+ * Get featured/top integrations subset
+ */
+export async function getTopIntegrations(limit?: number): Promise<IntegrationSummary[]> {
+  const top = await readJsonFile<IntegrationSummary[]>('integrations_top.json');
+  if (typeof limit === 'number') {
+    return top.slice(0, limit);
   }
+  return top;
 }
 
 /**
  * Get integration by slug
  */
 export async function getIntegrationBySlug(slug: string): Promise<IntegrationSummary | null> {
-  try {
-    const integrations = await getIntegrations();
-    return integrations.find((i) => i.slug === slug) || null;
-  } catch (error) {
-    console.error(`Error loading integration ${slug}:`, error);
-    return null;
-  }
+  const integrations = await getIntegrations();
+  return integrations.find((i) => i.slug === slug) || null;
 }
 
 /**
  * Get workflows by category
  */
 export async function getWorkflowsByCategory(categorySlug: string): Promise<WorkflowMeta[]> {
-  try {
-    const workflows = await getAllWorkflows();
-    return workflows.filter((w) => w.category === categorySlug);
-  } catch (error) {
-    console.error(`Error filtering workflows by category ${categorySlug}:`, error);
-    return [];
-  }
+  const workflows = await getAllWorkflows();
+  return workflows.filter((w) => w.category === categorySlug);
 }
 
 /**
  * Get workflows by integration
  */
 export async function getWorkflowsByIntegration(integrationSlug: string): Promise<WorkflowMeta[]> {
-  try {
-    const workflows = await getAllWorkflows();
-    return workflows.filter((w) => w.integrations.includes(integrationSlug));
-  } catch (error) {
-    console.error(`Error filtering workflows by integration ${integrationSlug}:`, error);
-    return [];
-  }
+  const workflows = await getAllWorkflows();
+  return workflows.filter((w) => w.integrations.includes(integrationSlug));
 }
 
 /**
  * Get featured workflows (high quality, curated)
  */
 export async function getFeaturedWorkflows(limit: number = 12): Promise<WorkflowMeta[]> {
-  try {
-    const workflows = await getAllWorkflows();
-    return workflows
-      .filter((w) => w.quality >= 4)
-      .sort((a, b) => {
-        // Prioritize awesome source
-        if (a.source === 'awesome' && b.source !== 'awesome') return -1;
-        if (a.source !== 'awesome' && b.source === 'awesome') return 1;
-        // Then by quality
-        return b.quality - a.quality;
-      })
-      .slice(0, limit);
-  } catch (error) {
-    console.error('Error getting featured workflows:', error);
-    return [];
-  }
+  const workflows = await getAllWorkflows();
+  return workflows
+    .filter((w) => w.quality >= 4)
+    .sort((a, b) => {
+      // Prioritize awesome source
+      if (a.source === 'awesome' && b.source !== 'awesome') return -1;
+      if (a.source !== 'awesome' && b.source === 'awesome') return 1;
+      // Then by quality
+      return b.quality - a.quality;
+    })
+    .slice(0, limit);
 }
 
 /**
@@ -158,11 +142,21 @@ export async function getFeaturedWorkflows(limit: number = 12): Promise<Workflow
  */
 export async function getStats(): Promise<Stats | null> {
   try {
-    const filePath = path.join(DATA_DIR, 'stats.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as Stats;
+    return await readJsonFile<Stats>('stats.json');
   } catch (error) {
     console.error('Error loading stats:', error);
+    return null;
+  }
+}
+
+/**
+ * Get dataset metadata (hashes, cache stats)
+ */
+export async function getDatasetMeta(): Promise<DatasetMeta | null> {
+  try {
+    return await readJsonFile<DatasetMeta>('meta.json');
+  } catch (error) {
+    console.error('Error loading dataset meta:', error);
     return null;
   }
 }

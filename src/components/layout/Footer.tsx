@@ -39,7 +39,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Discover 2,300+ free n8n workflow templates. Open source, community-driven.
+              Discover 2,348+ free n8n workflow templates. Open source, community-driven.
             </p>
             <div className="flex items-center gap-3">
               <a

@@ -71,7 +71,7 @@ export function Header() {
 
             {/* GitHub link */}
             <a
-              href="https://github.com/7and1/n8n-library"
+              href="https://github.com/7and1/n8n-Library"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:block"

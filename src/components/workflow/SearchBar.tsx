@@ -32,7 +32,7 @@ const iconSizes = {
 
 export function SearchBar({
   initialQuery = '',
-  placeholder = 'Search 2,300+ n8n workflow templates...',
+  placeholder = 'Search 2,348+ n8n workflow templates...',
   size = 'md',
   autoFocus = false,
   onSearch,

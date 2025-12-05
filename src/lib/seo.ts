@@ -14,7 +14,7 @@ export const defaultMetadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    'Discover 2,300+ free n8n workflow templates. Browse curated automation templates for AI, Telegram, Slack, Google Sheets, and more. Open source and ready to use.',
+    'Discover 2,348+ free n8n workflow templates. Browse curated automation templates for AI, Telegram, Slack, Google Sheets, and more. Open source and ready to use.',
   keywords: [
     'n8n',
     'workflow',
@@ -47,7 +47,7 @@ export const defaultMetadata: Metadata = {
     siteName: SITE_NAME,
     title: `${SITE_NAME} - Free n8n Workflow Templates`,
     description:
-      'Discover 2,300+ free n8n workflow templates for automation. AI, messaging, productivity, and more.',
+      'Discover 2,348+ free n8n workflow templates for automation. AI, messaging, productivity, and more.',
     images: [
       {
         url: `${SITE_URL}/og-image.png`,
@@ -61,7 +61,7 @@ export const defaultMetadata: Metadata = {
     card: 'summary_large_image',
     title: `${SITE_NAME} - Free n8n Workflow Templates`,
     description:
-      'Discover 2,300+ free n8n workflow templates for automation.',
+      'Discover 2,348+ free n8n workflow templates for automation.',
     images: [`${SITE_URL}/og-image.png`],
   },
   alternates: {
@@ -230,7 +230,7 @@ export function generateWebsiteJsonLd(): object {
     name: SITE_NAME,
     url: SITE_URL,
     description:
-      'Discover 2,300+ free n8n workflow templates for automation.',
+      'Discover 2,348+ free n8n workflow templates for automation.',
     potentialAction: {
       '@type': 'SearchAction',
       target: {

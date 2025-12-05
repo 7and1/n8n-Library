@@ -4,8 +4,8 @@ import { ArrowRight, Zap, GitFork, Users, Search, Clock, TrendingUp, CheckCircle
 import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = {
-  title: 'n8n Library - 2,300+ Free n8n Workflow Templates & Automation Examples',
-  description: 'Discover the largest collection of free n8n workflow templates. 2,300+ ready-to-use automation examples for AI, Slack, Google Sheets, Telegram & more. Import in seconds.',
+  title: 'n8n Library - 2,348+ Free n8n Workflow Templates & Automation Examples',
+  description: 'Discover the largest collection of free n8n workflow templates. 2,348+ ready-to-use automation examples for AI, Slack, Google Sheets, Telegram & more. Import in seconds.',
   keywords: [
     'n8n workflows',
     'n8n templates',
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     'free automation templates',
   ],
   openGraph: {
-    title: 'n8n Library - 2,300+ Free Workflow Templates',
+    title: 'n8n Library - 2,348+ Free Workflow Templates',
     description: 'The largest collection of free n8n workflow templates. Ready-to-use automation for AI, messaging, productivity & more.',
     type: 'website',
   },
@@ -28,20 +28,18 @@ import { SearchBar } from '@/components/workflow/SearchBar';
 import { WorkflowGrid } from '@/components/workflow/WorkflowGrid';
 import { CategoryGrid } from '@/components/workflow/CategoryCard';
 import { IntegrationIcon } from '@/components/workflow/IntegrationIcon';
-import { getCategories, getFeaturedWorkflows, getLatestWorkflows, getIntegrations, getStats } from '@/lib/data';
+import { getCategories, getFeaturedWorkflows, getLatestWorkflows, getTopIntegrations, getStats } from '@/lib/data';
 import { formatNumber } from '@/lib/utils';
 
 export default async function HomePage() {
   // Fetch data in parallel
-  const [categories, featuredWorkflows, latestWorkflows, integrations, stats] = await Promise.all([
+  const [categories, featuredWorkflows, latestWorkflows, topIntegrations, stats] = await Promise.all([
     getCategories(),
     getFeaturedWorkflows(12),
     getLatestWorkflows(12),
-    getIntegrations(),
+    getTopIntegrations(12),
     getStats(),
   ]);
-
-  const topIntegrations = integrations.slice(0, 12);
 
   return (
     <div className="flex flex-col">
@@ -58,7 +56,7 @@ export default async function HomePage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-sm font-medium">
               <GitFork className="w-4 h-4" />
-              {stats ? formatNumber(stats.total) : '2,300'}+ Free Templates
+              {stats ? formatNumber(stats.total) : '2,348'}+ Free Templates
             </div>
 
             {/* Headline */}
@@ -91,7 +89,7 @@ export default async function HomePage() {
               </div>
               <div className="flex items-center gap-2">
                 <Search className="w-4 h-4 text-brand-500" />
-                <span>{stats ? stats.integrations : 150}+ Integrations</span>
+                <span>{stats ? stats.integrations : 360}+ Integrations</span>
               </div>
             </div>
           </div>
@@ -200,7 +198,7 @@ export default async function HomePage() {
           <div className="mt-8 text-center">
             <Link href="/integration/">
               <Button variant="outline" className="gap-2">
-                View all {integrations.length} integrations
+                View all {stats ? stats.integrations : 364} integrations
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
@@ -406,7 +404,7 @@ export default async function HomePage() {
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white">Find Your Template</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Browse by category, search by integration, or just scroll. We have 2,300+ templates covering everything from AI chatbots to CRM automation.
+                  Browse by category, search by integration, or just scroll. We have {stats ? formatNumber(stats.total) : '2,348'}+ templates covering everything from AI chatbots to CRM automation.
                 </p>
               </div>
             </div>

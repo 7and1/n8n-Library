@@ -16,16 +16,52 @@
  */
 
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 const crypto = require('crypto');
+
+const sinceArg = process.argv.find(arg => arg.startsWith('--since='));
+const parsedSince = sinceArg ? new Date(sinceArg.split('=')[1]) : null;
+
+const CONFIG = {
+  awesomeRoot: path.resolve(__dirname, '../data/raw/awesome-n8n/'),
+  communityRoot: path.resolve(__dirname, '../data/raw/n8n-workflows/workflows/'),
+  communityRepoRoot: path.resolve(__dirname, '../data/raw/n8n-workflows/'),
+  outputDir: path.resolve(__dirname, '../public/data/'),
+  workflowsDir: path.resolve(__dirname, '../public/data/workflows/'),
+  debug: process.env.DEBUG === '1' || process.argv.includes('--debug'),
+  sourceFilter: process.argv.find(arg => arg.startsWith('--source='))?.split('=')[1] || 'all',
+  force: process.argv.includes('--force'),
+  since: parsedSince && !Number.isNaN(parsedSince.getTime()) ? parsedSince : null,
+  maxWorkers:
+    parseInt(
+      process.argv.find(arg => arg.startsWith('--max-workers='))?.split('=')[1] || '',
+      10
+    ) || Math.max(1, (os.cpus()?.length || 2) - 1),
+  pretty: process.argv.includes('--pretty'),
+  revalidateUrl:
+    process.env.WORKFLOW_REVALIDATE_URL ||
+    process.env.REVALIDATE_URL ||
+    process.argv.find(arg => arg.startsWith('--revalidate-url='))?.split('=')[1] ||
+    null,
+  revalidateToken:
+    process.env.WORKFLOW_REVALIDATE_TOKEN ||
+    process.env.REVALIDATE_TOKEN ||
+    process.argv.find(arg => arg.startsWith('--revalidate-token='))?.split('=')[1] ||
+    null,
+};
+
+const startTime = Date.now();
 
 // Check if pre-built data exists (skip ETL on CI when data is already committed)
 const prebuiltIndex = path.resolve(__dirname, '../public/data/index.json');
 const prebuiltWorkflows = path.resolve(__dirname, '../public/data/workflows/');
-if (fs.existsSync(prebuiltIndex) && fs.existsSync(prebuiltWorkflows)) {
+if (!CONFIG.force && fs.existsSync(prebuiltIndex) && fs.existsSync(prebuiltWorkflows)) {
   const files = fs.readdirSync(prebuiltWorkflows);
   if (files.length > 0) {
-    console.log('✅ Pre-built data found, skipping ETL pipeline');
+    console.log('✅ Pre-built data found, skipping ETL pipeline (use --force to rebuild)');
     console.log(`   Found ${files.length} workflow files in public/data/workflows/`);
     process.exit(0);
   }
@@ -51,18 +87,131 @@ const {
   extractIntegrations,
 } = require('./icon-map');
 
-// Configuration
-const CONFIG = {
-  awesomeRoot: path.resolve(__dirname, '../data/raw/awesome-n8n/'),
-  communityRoot: path.resolve(__dirname, '../data/raw/n8n-workflows/workflows/'),
-  outputDir: path.resolve(__dirname, '../public/data/'),
-  workflowsDir: path.resolve(__dirname, '../public/data/workflows/'),
-  debug: process.env.DEBUG === '1' || process.argv.includes('--debug'),
-  sourceFilter: process.argv.find(arg => arg.startsWith('--source='))?.split('=')[1] || 'all',
-};
+const CACHE_DIR = path.resolve(__dirname, '../.cache');
+const MANIFEST_PATH = path.join(CACHE_DIR, 'workflow-manifest.json');
+const manifestState = loadManifest();
+const manifestEntries = manifestState.workflows;
+let manifestDirty = false;
+let manifestUpdatedAt = manifestState.updatedAt || null;
+let cacheHits = 0;
+let skippedBySince = 0;
 
 // Track used slugs for uniqueness
 const usedSlugs = new Set();
+
+function loadManifest() {
+  try {
+    if (!fs.existsSync(MANIFEST_PATH)) {
+      return { version: 1, workflows: {}, updatedAt: null };
+    }
+    const raw = fs.readFileSync(MANIFEST_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return {
+      version: parsed.version || 1,
+      workflows: parsed.workflows || {},
+      updatedAt: parsed.updatedAt || null,
+    };
+  } catch (error) {
+    console.warn('⚠ Unable to load cache manifest, rebuilding everything.');
+    if (CONFIG.debug) {
+      console.error(error);
+    }
+    return { version: 1, workflows: {}, updatedAt: null };
+  }
+}
+
+function saveManifest() {
+  if (!manifestDirty) return;
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+  const payload = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    workflows: manifestEntries,
+  };
+  writeJsonFile(MANIFEST_PATH, payload);
+  manifestUpdatedAt = payload.updatedAt;
+}
+
+function hashContent(content) {
+  return crypto.createHash('md5').update(content).digest('hex');
+}
+
+function getRelativePath(filePath) {
+  return path.relative(process.cwd(), filePath);
+}
+
+function getCachedWorkflow(relativePath, hash) {
+  if (CONFIG.force) return null;
+  const entry = manifestEntries[relativePath];
+  if (!entry) return null;
+  if (hash && entry.hash && entry.hash !== hash) {
+    return null;
+  }
+  cacheHits += 1;
+  usedSlugs.add(entry.workflow.slug);
+  return entry.workflow;
+}
+
+function cacheWorkflow(relativePath, hash, workflow) {
+  manifestEntries[relativePath] = { hash, workflow };
+  manifestDirty = true;
+}
+
+function getRepoInfo(label, repoPath) {
+  const base = {
+    label,
+    path: repoPath,
+    exists: fs.existsSync(repoPath),
+  };
+
+  if (!base.exists) {
+    return { ...base, error: 'missing repository path' };
+  }
+
+  try {
+    const commit = execSync('git rev-parse HEAD', { cwd: repoPath }).toString().trim();
+    const shortCommit = execSync('git rev-parse --short HEAD', { cwd: repoPath }).toString().trim();
+    let remote = null;
+    try {
+      remote = execSync('git remote get-url origin', { cwd: repoPath }).toString().trim();
+    } catch (error) {
+      if (CONFIG.debug) {
+        console.warn(`⚠ Unable to read remote for ${label}:`, error.message);
+      }
+    }
+    let lastCommitAt = null;
+    try {
+      lastCommitAt = execSync('git log -1 --format=%cI', { cwd: repoPath }).toString().trim();
+    } catch (error) {
+      if (CONFIG.debug) {
+        console.warn(`⚠ Unable to read last commit time for ${label}:`, error.message);
+      }
+    }
+    let status = null;
+    try {
+      status = execSync('git status --short --untracked-files=no', { cwd: repoPath })
+        .toString()
+        .trim();
+    } catch (error) {
+      if (CONFIG.debug) {
+        console.warn(`⚠ Unable to read git status for ${label}:`, error.message);
+      }
+    }
+
+    return {
+      ...base,
+      commit,
+      shortCommit,
+      lastCommitAt,
+      remote,
+      dirty: Boolean(status),
+    };
+  } catch (error) {
+    return { ...base, error: error.message };
+  }
+}
 
 // ============================================
 // Utility Functions
@@ -391,7 +540,7 @@ function parseWorkflow(json, filePath, folderName, source) {
 /**
  * Parse awesome-n8n-templates repository
  */
-function parseAwesomeLibrary() {
+async function parseAwesomeLibrary() {
   console.log('📂 Parsing awesome-n8n-templates...');
 
   if (!fs.existsSync(CONFIG.awesomeRoot)) {
@@ -401,61 +550,34 @@ function parseAwesomeLibrary() {
 
   const workflows = [];
   const entries = fs.readdirSync(CONFIG.awesomeRoot, { withFileTypes: true });
-
-  // Get all folders (categories)
   const folders = entries.filter(d => d.isDirectory() && !d.name.startsWith('.'));
+  const tasks = [];
 
   for (const folder of folders) {
     const folderPath = path.join(CONFIG.awesomeRoot, folder.name);
-
-    // Get JSON files in folder
-    const files = fs.readdirSync(folderPath)
-      .filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.json'));
 
     if (CONFIG.debug && files.length > 0) {
       console.log(`  📁 ${folder.name}: ${files.length} files`);
     }
 
     for (const file of files) {
-      const filePath = path.join(folderPath, file);
-
-      try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const json = JSON.parse(content);
-
-        const workflow = parseWorkflow(json, filePath, folder.name, 'awesome');
-        if (workflow) {
-          workflows.push(workflow);
-        }
-      } catch (err) {
-        console.error(`  ❌ Error parsing ${filePath}: ${err.message}`);
-      }
+      tasks.push({ filePath: path.join(folderPath, file), folder: folder.name });
     }
   }
 
-  // Also check root-level JSON files
   const rootJsonFiles = entries
     .filter(e => e.isFile() && e.name.endsWith('.json'))
-    .map(e => e.name);
+    .map(e => ({ filePath: path.join(CONFIG.awesomeRoot, e.name), folder: 'Other' }));
 
-  for (const file of rootJsonFiles) {
-    const filePath = path.join(CONFIG.awesomeRoot, file);
+  tasks.push(...rootJsonFiles);
 
-    try {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const json = JSON.parse(content);
-
-      const workflow = parseWorkflow(json, filePath, 'Other', 'awesome');
-      if (workflow) {
-        workflows.push(workflow);
-      }
-    } catch (err) {
-      // Skip non-workflow JSON files silently
-      if (CONFIG.debug) {
-        console.warn(`  ⚠ Skipped ${file}: ${err.message}`);
-      }
+  await runWithConcurrency(tasks, CONFIG.maxWorkers, async ({ filePath, folder }) => {
+    const workflow = await loadWorkflowFromFile(filePath, folder, 'awesome');
+    if (workflow) {
+      workflows.push(workflow);
     }
-  }
+  });
 
   console.log(`  ✅ Found ${workflows.length} workflows\n`);
   return workflows;
@@ -464,7 +586,7 @@ function parseAwesomeLibrary() {
 /**
  * Parse n8n-workflows repository
  */
-function parseCommunityLibrary() {
+async function parseCommunityLibrary() {
   console.log('📂 Parsing n8n-workflows...');
 
   if (!fs.existsSync(CONFIG.communityRoot)) {
@@ -474,17 +596,14 @@ function parseCommunityLibrary() {
 
   const workflows = [];
   const entries = fs.readdirSync(CONFIG.communityRoot, { withFileTypes: true });
-
-  // Get all folders (numbered like 0001, 0002, etc.)
   const folders = entries.filter(d => d.isDirectory());
 
   let processed = 0;
   let errors = 0;
+  const tasks = [];
 
   for (const folder of folders) {
     const folderPath = path.join(CONFIG.communityRoot, folder.name);
-
-    // Get JSON files in folder
     let files;
     try {
       files = fs.readdirSync(folderPath).filter(f => f.endsWith('.json'));
@@ -493,30 +612,22 @@ function parseCommunityLibrary() {
     }
 
     for (const file of files) {
-      const filePath = path.join(folderPath, file);
-
-      try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const json = JSON.parse(content);
-
-        const workflow = parseWorkflow(json, filePath, folder.name, 'community');
-        if (workflow) {
-          workflows.push(workflow);
-          processed++;
-        }
-      } catch (err) {
-        errors++;
-        if (CONFIG.debug) {
-          console.error(`  ❌ Error parsing ${filePath}: ${err.message}`);
-        }
-      }
-    }
-
-    // Progress indicator
-    if (processed % 500 === 0 && processed > 0) {
-      process.stdout.write(`  📊 Processed ${processed} workflows...\r`);
+      tasks.push({ filePath: path.join(folderPath, file), folder: folder.name });
     }
   }
+
+  await runWithConcurrency(tasks, CONFIG.maxWorkers, async ({ filePath, folder }) => {
+    const workflow = await loadWorkflowFromFile(filePath, folder, 'community');
+    if (workflow) {
+      workflows.push(workflow);
+      processed++;
+      if (processed % 500 === 0 && processed > 0) {
+        process.stdout.write(`  📊 Processed ${processed} workflows...\r`);
+      }
+    } else {
+      errors++;
+    }
+  });
 
   console.log(`  ✅ Found ${workflows.length} workflows (${errors} errors)\n`);
   return workflows;
@@ -536,6 +647,56 @@ function ensureDirectories() {
   if (!fs.existsSync(CONFIG.workflowsDir)) {
     fs.mkdirSync(CONFIG.workflowsDir, { recursive: true });
   }
+}
+
+async function loadWorkflowFromFile(filePath, folderName, source) {
+  const relativePath = getRelativePath(filePath);
+  try {
+    const stats = await fsp.stat(filePath);
+    if (CONFIG.since && stats.mtime < CONFIG.since) {
+      const cached = getCachedWorkflow(relativePath);
+      if (cached) {
+        skippedBySince += 1;
+        return cached;
+      }
+    }
+
+    const content = await fsp.readFile(filePath, 'utf-8');
+    const hash = hashContent(content);
+    const cached = getCachedWorkflow(relativePath, hash);
+    if (cached) {
+      return cached;
+    }
+
+    const json = JSON.parse(content);
+    const workflow = parseWorkflow(json, filePath, folderName, source);
+    if (workflow) {
+      cacheWorkflow(relativePath, hash, workflow);
+    }
+    return workflow;
+  } catch (err) {
+    console.error(`  ❌ Error parsing ${filePath}: ${err.message}`);
+    return null;
+  }
+}
+
+function writeJsonFile(filePath, data) {
+  const content = CONFIG.pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
+  fs.writeFileSync(filePath, content);
+}
+
+async function runWithConcurrency(items, limit, iterator) {
+  const queue = [...items];
+  if (queue.length === 0) return;
+  const workerCount = Math.max(1, Math.min(limit, queue.length));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      if (!item) return;
+      await iterator(item);
+    }
+  });
+  await Promise.all(workers);
 }
 
 /**
@@ -567,7 +728,7 @@ function generateIndex(workflows) {
   });
 
   const outputPath = path.join(CONFIG.outputDir, 'index.json');
-  fs.writeFileSync(outputPath, JSON.stringify(indexData));
+  writeJsonFile(outputPath, indexData);
 
   const sizeMB = (Buffer.byteLength(JSON.stringify(indexData)) / 1024 / 1024).toFixed(2);
   console.log(`  ✅ index.json: ${indexData.length} workflows (${sizeMB} MB)`);
@@ -595,7 +756,7 @@ function generateCategories(workflows) {
   })).sort((a, b) => b.count - a.count);
 
   const outputPath = path.join(CONFIG.outputDir, 'categories.json');
-  fs.writeFileSync(outputPath, JSON.stringify(categories, null, 2));
+  writeJsonFile(outputPath, categories);
 
   console.log(`  ✅ categories.json: ${categories.length} categories`);
 
@@ -631,7 +792,7 @@ function generateIntegrations(workflows) {
   }
 
   // Convert to array and sort by count
-  const integrations = Array.from(integrationMap.values())
+  const allIntegrations = Array.from(integrationMap.values())
     .map(int => ({
       slug: int.slug,
       name: int.name,
@@ -641,15 +802,20 @@ function generateIntegrations(workflows) {
       count: int.count,
       categories: Array.from(int.categories),
     }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 150); // Top 150 integrations
+    .sort((a, b) => b.count - a.count);
 
-  const outputPath = path.join(CONFIG.outputDir, 'integrations.json');
-  fs.writeFileSync(outputPath, JSON.stringify(integrations, null, 2));
+  const topIntegrations = allIntegrations.slice(0, 150);
 
-  console.log(`  ✅ integrations.json: ${integrations.length} integrations`);
+  const allPath = path.join(CONFIG.outputDir, 'integrations.json');
+  const topPath = path.join(CONFIG.outputDir, 'integrations_top.json');
+  writeJsonFile(allPath, allIntegrations);
+  writeJsonFile(topPath, topIntegrations);
 
-  return integrations;
+  console.log(
+    `  ✅ integrations.json: ${allIntegrations.length} total · integrations_top.json: ${topIntegrations.length} featured`
+  );
+
+  return { allIntegrations, topIntegrations };
 }
 
 /**
@@ -681,7 +847,7 @@ function generateWorkflowFiles(workflows) {
     };
 
     const outputPath = path.join(CONFIG.workflowsDir, `${w.slug}.json`);
-    fs.writeFileSync(outputPath, JSON.stringify(detailData));
+    writeJsonFile(outputPath, detailData);
     count++;
 
     // Progress
@@ -691,6 +857,7 @@ function generateWorkflowFiles(workflows) {
   }
 
   console.log(`  ✅ workflows/: ${count} individual files`);
+  return count;
 }
 
 /**
@@ -723,15 +890,118 @@ function generateStats(workflows, categories, integrations) {
   });
 
   const outputPath = path.join(CONFIG.outputDir, 'stats.json');
-  fs.writeFileSync(outputPath, JSON.stringify(stats, null, 2));
+  writeJsonFile(outputPath, stats);
 
   return stats;
+}
+
+function createMetaPayload({
+  workflowCount,
+  workflowFileCount,
+  indexData,
+  categories,
+  integrations,
+  topIntegrations,
+  stats,
+  finishedAt,
+}) {
+  const datasetHash = hashContent(JSON.stringify(indexData));
+  const cacheMisses = Math.max(workflowCount - cacheHits, 0);
+  return {
+    version: 1,
+    datasetHash,
+    startedAt: new Date(startTime).toISOString(),
+    generatedAt: finishedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startTime,
+    cli: {
+      force: CONFIG.force,
+      since: CONFIG.since ? CONFIG.since.toISOString() : null,
+      maxWorkers: CONFIG.maxWorkers,
+      pretty: CONFIG.pretty,
+      source: CONFIG.sourceFilter,
+    },
+    cache: {
+      manifestPath: path.relative(process.cwd(), MANIFEST_PATH),
+      manifestEntries: Object.keys(manifestEntries).length,
+      manifestUpdatedAt,
+      hits: cacheHits,
+      misses: cacheMisses,
+      skippedBySince,
+      usedSinceFilter: Boolean(CONFIG.since),
+      revalidate: null,
+    },
+    counts: {
+      workflows: workflowCount,
+      workflowFiles: workflowFileCount,
+      categories: categories.length,
+      integrations: integrations.length,
+      featuredIntegrations: topIntegrations.length,
+    },
+    stats,
+    sources: {
+      awesome: getRepoInfo('awesome-n8n', CONFIG.awesomeRoot),
+      community: getRepoInfo('n8n-workflows', CONFIG.communityRepoRoot || CONFIG.communityRoot),
+    },
+    files: {
+      index: path.relative(process.cwd(), path.join(CONFIG.outputDir, 'index.json')),
+      categories: path.relative(process.cwd(), path.join(CONFIG.outputDir, 'categories.json')),
+      integrations: path.relative(process.cwd(), path.join(CONFIG.outputDir, 'integrations.json')),
+      integrationsTop: path.relative(process.cwd(), path.join(CONFIG.outputDir, 'integrations_top.json')),
+      workflowsDir: path.relative(process.cwd(), CONFIG.workflowsDir),
+    },
+  };
+}
+
+async function triggerCacheRevalidation(metaPayload) {
+  if (!CONFIG.revalidateUrl) return null;
+  if (typeof fetch !== 'function') {
+    console.warn('  ⚠ Cannot trigger cache revalidation: fetch API unavailable in this runtime');
+    return null;
+  }
+  console.log('🔁 Triggering workflows-data cache revalidation...');
+
+  try {
+    const response = await fetch(CONFIG.revalidateUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(CONFIG.revalidateToken ? { Authorization: `Bearer ${CONFIG.revalidateToken}` } : {}),
+      },
+      body: JSON.stringify({
+        tag: 'workflows-data',
+        datasetHash: metaPayload.datasetHash,
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body.error || `HTTP ${response.status}`);
+    }
+
+    console.log('  ✅ Next.js cache revalidation requested');
+    return {
+      success: true,
+      status: response.status,
+      timestamp: new Date().toISOString(),
+      url: CONFIG.revalidateUrl,
+      body,
+    };
+  } catch (error) {
+    console.warn('  ⚠ Failed to trigger cache revalidation:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      url: CONFIG.revalidateUrl,
+    };
+  }
 }
 
 /**
  * Print summary statistics
  */
-function printSummary(stats) {
+function printSummary(stats, meta) {
   console.log('\n📈 ETL Summary');
   console.log('═'.repeat(50));
   console.log(`Total Workflows: ${stats.total}`);
@@ -755,6 +1025,22 @@ function printSummary(stats) {
   console.log(`Categories: ${stats.categories}`);
   console.log(`Unique Integrations: ${stats.integrations}`);
   console.log(`Avg Nodes/Workflow: ${stats.avgNodesPerWorkflow}`);
+  console.log('');
+  console.log(`Cache hits: ${cacheHits}`);
+  if (CONFIG.since) {
+    console.log(`  └─ reused via --since cutoff: ${skippedBySince}`);
+  }
+  if (meta) {
+    console.log('');
+    console.log(`Dataset hash: ${meta.datasetHash}`);
+    console.log(`Manifest entries: ${meta.cache.manifestEntries}`);
+    console.log(`Meta duration: ${(meta.durationMs / 1000).toFixed(2)}s`);
+    if (meta.cache.revalidate) {
+      console.log(
+        `Revalidate: ${meta.cache.revalidate.success ? 'OK' : 'FAILED'} ${meta.cache.revalidate.url || ''}`
+      );
+    }
+  }
   console.log('═'.repeat(50));
 }
 
@@ -777,12 +1063,12 @@ async function main() {
   let workflows = [];
 
   if (CONFIG.sourceFilter === 'all' || CONFIG.sourceFilter === 'awesome') {
-    const awesomeWorkflows = parseAwesomeLibrary();
+    const awesomeWorkflows = await parseAwesomeLibrary();
     workflows = workflows.concat(awesomeWorkflows);
   }
 
   if (CONFIG.sourceFilter === 'all' || CONFIG.sourceFilter === 'community') {
-    const communityWorkflows = parseCommunityLibrary();
+    const communityWorkflows = await parseCommunityLibrary();
     workflows = workflows.concat(communityWorkflows);
   }
 
@@ -797,12 +1083,34 @@ async function main() {
   console.log('📝 Generating output files...');
   const indexData = generateIndex(workflows);
   const categories = generateCategories(workflows);
-  const integrations = generateIntegrations(workflows);
-  generateWorkflowFiles(workflows);
+  const { allIntegrations, topIntegrations } = generateIntegrations(workflows);
+  const workflowFileCount = generateWorkflowFiles(workflows);
 
   // Generate and print stats
-  const stats = generateStats(workflows, categories, integrations);
-  printSummary(stats);
+  const stats = generateStats(workflows, categories, allIntegrations);
+
+  // Persist manifest + meta
+  saveManifest();
+  const finishedAt = new Date();
+  const metaPayload = createMetaPayload({
+    workflowCount: workflows.length,
+    workflowFileCount,
+    indexData,
+    categories,
+    integrations: allIntegrations,
+    topIntegrations,
+    stats,
+    finishedAt,
+  });
+  const revalidateInfo = await triggerCacheRevalidation(metaPayload);
+  if (revalidateInfo) {
+    metaPayload.cache.revalidate = revalidateInfo;
+  }
+  const metaPath = path.join(CONFIG.outputDir, 'meta.json');
+  writeJsonFile(metaPath, metaPayload);
+  console.log(`  ✅ meta.json written (hash ${metaPayload.datasetHash})`);
+
+  printSummary(stats, metaPayload);
 
   console.log('\n✅ ETL Pipeline Complete!');
   console.log(`📁 Output: ${CONFIG.outputDir}`);
